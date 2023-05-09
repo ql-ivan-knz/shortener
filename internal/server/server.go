@@ -1,14 +1,14 @@
-package app
+package server
 
 import (
 	"log"
 	"net/http"
-	"shortener/internal/app/routes"
+	"shortener/internal/handlers"
 )
 
 func StartServer() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", routes.MainHandler)
+	mux.HandleFunc("/", handlers.MainHandler)
 
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }

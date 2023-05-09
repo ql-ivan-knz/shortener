@@ -1,7 +1,7 @@
 package main
 
-import "shortener/internal/app"
+import "shortener/internal/server"
 
 func main() {
-	app.StartServer()
+	server.StartServer()
 }

@@ -1,11 +1,11 @@
-package routes
+package handlers
 
 import (
 	"io"
 	"net/http"
 	"net/url"
-	"shortener/internal/app/short"
-	"shortener/internal/app/store"
+	"shortener/internal/short"
+	"shortener/internal/storage"
 	"strings"
 )
 
@@ -13,14 +13,14 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
 	if path == "/" {
-		createShortHandler(w, r)
+		CreateShortHandler(w, r)
 		return
 	}
 
-	getShortHandler(w, r)
+	GetShortHandler(w, r)
 }
 
-func createShortHandler(w http.ResponseWriter, r *http.Request) {
+func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
 		return
@@ -37,14 +37,14 @@ func createShortHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hash := short.URL(body)
-	store.Set(hash, string(body))
+	storage.Set(hash, string(body))
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	_, _ = w.Write([]byte("http://localhost:8080/" + hash))
 }
 
-func getShortHandler(w http.ResponseWriter, r *http.Request) {
+func GetShortHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(r.URL.Path, "/")
 	pathParts := strings.Split(path, "/")
 
@@ -54,13 +54,13 @@ func getShortHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET method allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
 
 	key := pathParts[0]
 
-	v, err := store.Get(string(key))
+	v, err := storage.Get(string(key))
 	if err != nil {
 		http.Error(w, "Couldn't find"+string(v), http.StatusBadRequest)
 		return
