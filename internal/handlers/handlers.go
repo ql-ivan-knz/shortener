@@ -1,31 +1,15 @@
 package handlers
 
 import (
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/url"
 	"shortener/internal/short"
 	"shortener/internal/storage"
-	"strings"
 )
 
-func MainHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-
-	if path == "/" {
-		CreateShortHandler(w, r)
-		return
-	}
-
-	GetShortHandler(w, r)
-}
-
 func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
-		return
-	}
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't parse url", http.StatusBadRequest)
@@ -45,22 +29,9 @@ func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetShortHandler(w http.ResponseWriter, r *http.Request) {
-	path := strings.Trim(r.URL.Path, "/")
-	pathParts := strings.Split(path, "/")
+	id := chi.URLParam(r, "id")
 
-	if len(pathParts) > 1 {
-		http.Error(w, "expected url be /:id", http.StatusBadRequest)
-		return
-	}
-
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
-		return
-	}
-
-	key := pathParts[0]
-
-	v, err := storage.Get(string(key))
+	v, err := storage.Get(string(id))
 	if err != nil {
 		http.Error(w, "Couldn't find"+string(v), http.StatusBadRequest)
 		return
