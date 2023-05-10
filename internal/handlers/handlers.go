@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/url"
+	"shortener/config"
 	"shortener/internal/short"
 	"shortener/internal/storage"
 )
@@ -25,7 +27,7 @@ func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte("http://localhost:8080/" + hash))
+	_, _ = w.Write([]byte(fmt.Sprintf("%s/%s", config.ResAddr, hash)))
 }
 
 func GetShortHandler(w http.ResponseWriter, r *http.Request) {

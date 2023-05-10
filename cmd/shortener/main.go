@@ -1,7 +1,12 @@
 package main
 
-import "shortener/internal/server"
+import (
+	"shortener/config"
+	"shortener/internal/server"
+)
 
 func main() {
-	server.StartServer()
+	config.ParseFlags()
+
+	server.StartServer(config.Addr)
 }
