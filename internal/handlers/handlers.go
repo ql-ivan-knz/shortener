@@ -11,7 +11,7 @@ import (
 	"shortener/internal/storage"
 )
 
-func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
+func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't parse url", http.StatusBadRequest)
@@ -27,11 +27,11 @@ func CreateShortHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(fmt.Sprintf("%s/%s", config.ResAddr, hash)))
+	_, _ = w.Write([]byte(fmt.Sprintf("%s/%s", config.BaseURL, hash)))
 }
 
-func GetShortHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+func GetShortURL(w http.ResponseWriter, r *http.Request) {
+	id := getIDParam(r)
 
 	v, err := storage.Get(string(id))
 	if err != nil {
@@ -42,4 +42,8 @@ func GetShortHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Location", v)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func getIDParam(r *http.Request) string {
+	return chi.URLParam(r, "id")
 }

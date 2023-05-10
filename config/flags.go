@@ -1,15 +1,26 @@
 package config
 
-import "flag"
+import (
+	"flag"
+	"os"
+)
 
 var (
-	Addr    string
-	ResAddr string
+	ServerAddr string
+	BaseURL    string
 )
 
 func ParseFlags() {
-	flag.StringVar(&Addr, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&ResAddr, "b", "http://localhost:8080", "")
+	flag.StringVar(&ServerAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&BaseURL, "b", "http://localhost:8080", "")
 
 	flag.Parse()
+
+	if envAddr := os.Getenv("SERVER_ADDRESS"); envAddr != "" {
+		ServerAddr = envAddr
+	}
+
+	if resAddr := os.Getenv("BASE_URL"); resAddr != "" {
+		BaseURL = resAddr
+	}
 }

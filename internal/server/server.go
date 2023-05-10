@@ -13,8 +13,8 @@ func StartServer(addr string) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Post("/", handlers.CreateShortHandler)
-	r.Get("/{id}", handlers.GetShortHandler)
+	r.Post("/", handlers.CreateShortURL)
+	r.Get("/{id}", handlers.GetShortURL)
 
 	fmt.Println("Running server on", addr)
 	log.Fatal(http.ListenAndServe(addr, r))

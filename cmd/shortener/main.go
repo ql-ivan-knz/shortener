@@ -8,5 +8,5 @@ import (
 func main() {
 	config.ParseFlags()
 
-	server.StartServer(config.Addr)
+	server.StartServer(config.ServerAddr)
 }

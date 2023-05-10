@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestCreateShortHandler(t *testing.T) {
+func TestCreateShortURL(t *testing.T) {
 	tests := []struct {
 		name                string
 		method              string
@@ -43,7 +43,7 @@ func TestCreateShortHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
-			CreateShortHandler(w, r)
+			CreateShortURL(w, r)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -57,7 +57,7 @@ func TestCreateShortHandler(t *testing.T) {
 	}
 }
 
-func TestGetShortHandler(t *testing.T) {
+func TestGetShortURL(t *testing.T) {
 	tests := []struct {
 		name         string
 		method       string
@@ -80,7 +80,7 @@ func TestGetShortHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, test.path, nil)
 			w := httptest.NewRecorder()
-			GetShortHandler(w, r)
+			GetShortURL(w, r)
 
 			assert.Equal(t, test.expectedCode, w.Code)
 		})
