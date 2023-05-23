@@ -1,26 +1,19 @@
 package storage
 
-import (
-	"errors"
-	"fmt"
-)
+type Storage map[string]string
 
-var errNoExistedURL = errors.New("url_store: no existed url")
+var storage Storage = make(map[string]string)
 
-var store = make(map[string]string)
-
-func Get(key string) (string, error) {
-	if _, ok := store[key]; ok {
-		return store[key], nil
-	}
-
-	return "", errNoExistedURL
+func (s Storage) Set(key, value string) {
+	s[key] = value
 }
 
-func Set(key, value string) {
-	store[key] = value
+func (s Storage) Get(key string) (string, bool) {
+	v, ok := s[key]
+
+	return v, ok
 }
 
-func GetAll() {
-	fmt.Println(store)
+func NewStorage() *Storage {
+	return &storage
 }

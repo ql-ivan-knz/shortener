@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,7 +10,7 @@ import (
 	"shortener/internal/storage"
 )
 
-func CreateShortURL(w http.ResponseWriter, r *http.Request) {
+func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, store *storage.Storage) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't parse url", http.StatusBadRequest)
@@ -23,27 +22,29 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hash := short.URL(body)
-	storage.Set(hash, string(body))
+	store.Set(hash, string(body))
+	shortURL, err := url.JoinPath(cfg.BaseURL, hash)
+	if err != nil {
+		http.Error(w, "Couldn't generate url", http.StatusInternalServerError)
+	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(fmt.Sprintf("%s/%s", config.BaseURL, hash)))
+	_, err = w.Write([]byte(shortURL))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 }
 
-func GetShortURL(w http.ResponseWriter, r *http.Request) {
-	id := getIDParam(r)
-
-	v, err := storage.Get(string(id))
-	if err != nil {
-		http.Error(w, "Couldn't find"+string(v), http.StatusBadRequest)
+func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store *storage.Storage) {
+	v, ok := store.Get(id)
+	if !ok {
+		http.Error(w, fmt.Sprintf("Couldn't find %s", v), http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Location", v)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-}
-
-func getIDParam(r *http.Request) string {
-	return chi.URLParam(r, "id")
 }

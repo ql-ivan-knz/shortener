@@ -1,21 +1,45 @@
 package server
 
 import (
-	"fmt"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
+	"shortener/config"
 	"shortener/internal/handlers"
+	"shortener/internal/logger"
+	"shortener/internal/storage"
 )
 
-func StartServer(addr string) {
+type payload struct {
+	config  config.Config
+	storage *storage.Storage
+}
+
+func StartServer() {
+	p := payload{storage: storage.NewStorage(), config: config.GetConfig()}
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	logger.Initialize()
 
-	r.Post("/", handlers.CreateShortURL)
-	r.Get("/{id}", handlers.GetShortURL)
+	r.Post("/", logger.WithLogging(p.createShortURLHandler()))
+	r.Get("/{id}", logger.WithLogging(p.getShortURLHandler()))
 
-	fmt.Println("Running server on", addr)
-	log.Fatal(http.ListenAndServe(addr, r))
+	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr))
+	err := http.ListenAndServe(p.config.ServerAddr, r)
+	if err != nil {
+		logger.Log.Fatal(err.Error())
+		return
+	}
+}
+
+func (p *payload) createShortURLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handlers.CreateShortURL(w, r, p.config, p.storage)
+	}
+}
+
+func (p *payload) getShortURLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		handlers.GetShortURL(w, r, string(id), p.storage)
+	}
 }

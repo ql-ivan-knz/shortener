@@ -5,11 +5,20 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"shortener/config"
+	"shortener/internal/storage"
 	"strings"
 	"testing"
 )
 
 func TestCreateShortURL(t *testing.T) {
+	var store storage.Storage = make(map[string]string)
+	cfg := config.Config{
+		ServerAddr: "localhost:8080",
+		BaseURL:    "http://localhost:8080",
+	}
+	url := "http://github.com"
+
 	tests := []struct {
 		name                string
 		method              string
@@ -34,7 +43,7 @@ func TestCreateShortURL(t *testing.T) {
 		{
 			name:                "returns 201 status code",
 			method:              http.MethodPost,
-			body:                strings.NewReader("https://github.com"),
+			body:                strings.NewReader(url),
 			expectedCode:        http.StatusCreated,
 			expectedContentType: "text/plain",
 		},
@@ -43,7 +52,7 @@ func TestCreateShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
-			CreateShortURL(w, r)
+			CreateShortURL(w, r, cfg, &store)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -58,6 +67,9 @@ func TestCreateShortURL(t *testing.T) {
 }
 
 func TestGetShortURL(t *testing.T) {
+	var store storage.Storage = make(map[string]string)
+	pathID := "3097fca9"
+
 	tests := []struct {
 		name         string
 		method       string
@@ -80,7 +92,7 @@ func TestGetShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, test.path, nil)
 			w := httptest.NewRecorder()
-			GetShortURL(w, r)
+			GetShortURL(w, r, pathID, &store)
 
 			assert.Equal(t, test.expectedCode, w.Code)
 		})
