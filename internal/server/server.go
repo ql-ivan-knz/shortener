@@ -20,8 +20,9 @@ func StartServer() {
 	r := chi.NewRouter()
 	logger.Initialize()
 
-	r.Post("/", logger.WithLogging(p.createShortURLHandler()))
-	r.Get("/{id}", logger.WithLogging(p.getShortURLHandler()))
+	r.Post("/", logger.WithLogging(p.createShortURLHandler))
+	r.Post("/api/shorten", logger.WithLogging(p.shortenHandler))
+	r.Get("/{id}", logger.WithLogging(p.getShortURLHandler))
 
 	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr))
 	err := http.ListenAndServe(p.config.ServerAddr, r)
@@ -31,15 +32,15 @@ func StartServer() {
 	}
 }
 
-func (p *payload) createShortURLHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		handlers.CreateShortURL(w, r, p.config, p.storage)
-	}
+func (p *payload) createShortURLHandler(w http.ResponseWriter, r *http.Request) {
+	handlers.CreateShortURL(w, r, p.config, p.storage)
 }
 
-func (p *payload) getShortURLHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-		handlers.GetShortURL(w, r, string(id), p.storage)
-	}
+func (p *payload) shortenHandler(w http.ResponseWriter, r *http.Request) {
+	handlers.Shorten(w, r, p.config, p.storage)
+}
+
+func (p *payload) getShortURLHandler(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	handlers.GetShortURL(w, r, string(id), p.storage)
 }

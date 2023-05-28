@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"shortener/config"
+	"shortener/internal/models"
 	"shortener/internal/storage"
 	"strings"
 	"testing"
@@ -62,6 +65,55 @@ func TestCreateShortURL(t *testing.T) {
 			if test.expectedContentType != "" {
 				assert.Equal(t, strings.Split(res.Header.Get("content-type"), ";")[0], test.expectedContentType)
 			}
+		})
+	}
+}
+
+func TestCreateShortURLJSON(t *testing.T) {
+	var store storage.Storage = make(map[string]string)
+	cfg := config.Config{
+		ServerAddr: "localhost:8080",
+		BaseURL:    "http://localhost:8080",
+	}
+
+	tests := []struct {
+		name         string
+		method       string
+		body         models.Request
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "returns error code if method not POST",
+			method:       http.MethodGet,
+			body:         models.Request{URL: "https://github.com"},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "returns error code if provided bad url",
+			method:       http.MethodPost,
+			body:         models.Request{URL: ""},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "returns 200 status code",
+			method:       http.MethodPost,
+			body:         models.Request{URL: "https://github.com"},
+			expectedCode: http.StatusCreated,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body, _ := json.Marshal(test.body)
+			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			Shorten(w, r, cfg, &store)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, res.StatusCode, test.expectedCode)
 		})
 	}
 }
