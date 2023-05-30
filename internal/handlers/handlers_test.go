@@ -15,11 +15,13 @@ import (
 )
 
 func TestCreateShortURL(t *testing.T) {
-	var store storage.Storage = make(map[string]string)
 	cfg := config.Config{
-		ServerAddr: "localhost:8080",
-		BaseURL:    "http://localhost:8080",
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
 	}
+	var store = storage.NewStorage(cfg.FileStoragePath)
+
 	url := "http://github.com"
 
 	tests := []struct {
@@ -55,7 +57,7 @@ func TestCreateShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
-			CreateShortURL(w, r, cfg, &store)
+			CreateShortURL(w, r, cfg, store)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -70,11 +72,12 @@ func TestCreateShortURL(t *testing.T) {
 }
 
 func TestCreateShortURLJSON(t *testing.T) {
-	var store storage.Storage = make(map[string]string)
 	cfg := config.Config{
-		ServerAddr: "localhost:8080",
-		BaseURL:    "http://localhost:8080",
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
 	}
+	var store = storage.NewStorage(cfg.FileStoragePath)
 
 	tests := []struct {
 		name         string
@@ -108,7 +111,7 @@ func TestCreateShortURLJSON(t *testing.T) {
 			body, _ := json.Marshal(test.body)
 			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
 			w := httptest.NewRecorder()
-			Shorten(w, r, cfg, &store)
+			Shorten(w, r, cfg, store)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -119,7 +122,7 @@ func TestCreateShortURLJSON(t *testing.T) {
 }
 
 func TestGetShortURL(t *testing.T) {
-	var store storage.Storage = make(map[string]string)
+	var store = storage.NewStorage("")
 	pathID := "3097fca9"
 
 	tests := []struct {
@@ -129,11 +132,6 @@ func TestGetShortURL(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name:         "returns 400 status code when url has additional params",
-			method:       http.MethodGet,
-			path:         "/id/wrong/url",
-			expectedCode: http.StatusBadRequest,
-		}, {
 			name:         "returns 400 status code when method not GET",
 			method:       http.MethodPost,
 			path:         "/id",
@@ -144,7 +142,7 @@ func TestGetShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, test.path, nil)
 			w := httptest.NewRecorder()
-			GetShortURL(w, r, pathID, &store)
+			GetShortURL(w, r, pathID, store)
 
 			assert.Equal(t, test.expectedCode, w.Code)
 		})

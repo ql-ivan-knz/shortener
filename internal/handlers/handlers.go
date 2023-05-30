@@ -12,7 +12,7 @@ import (
 	"shortener/internal/storage"
 )
 
-func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, store *storage.Storage) {
+func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't parse url", http.StatusBadRequest)
@@ -24,7 +24,11 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 
 	hash := short.URL(body)
-	store.Set(hash, string(body))
+	err = store.Set(hash, string(body))
+	if err != nil {
+		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
+	}
+
 	shortURL, err := url.JoinPath(cfg.BaseURL, hash)
 	if err != nil {
 		http.Error(w, "Couldn't generate url", http.StatusInternalServerError)
@@ -39,7 +43,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 }
 
-func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store *storage.Storage) {
+func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage) {
 	var req models.Request
 
 	if r.Method != http.MethodPost {
@@ -58,7 +62,10 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store *s
 	}
 
 	hash := short.URL([]byte(req.URL))
-	store.Set(hash, req.URL)
+	err := store.Set(hash, req.URL)
+	if err != nil {
+		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
+	}
 	shortURL, err := url.JoinPath(cfg.BaseURL, hash)
 	if err != nil {
 		http.Error(w, "Couldn't generate url", http.StatusInternalServerError)
@@ -78,9 +85,14 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store *s
 	}
 }
 
-func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store *storage.Storage) {
-	v, ok := store.Get(id)
-	if !ok {
+func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storage.Storage) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
+		return
+	}
+
+	v, err := store.Get(id)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("Couldn't find %s", v), http.StatusBadRequest)
 		return
 	}

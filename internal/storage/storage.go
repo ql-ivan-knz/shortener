@@ -1,19 +1,14 @@
 package storage
 
-type Storage map[string]string
-
-var storage Storage = make(map[string]string)
-
-func (s Storage) Set(key, value string) {
-	s[key] = value
+type Storage interface {
+	Get(key string) (string, error)
+	Set(key, value string) error
 }
 
-func (s Storage) Get(key string) (string, bool) {
-	v, ok := s[key]
+func NewStorage(path string) Storage {
+	if path == "" {
+		return NewMapStorage()
+	}
 
-	return v, ok
-}
-
-func NewStorage() *Storage {
-	return &storage
+	return NewFileStorage(path)
 }

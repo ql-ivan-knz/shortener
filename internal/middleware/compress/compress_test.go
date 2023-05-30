@@ -14,16 +14,18 @@ import (
 )
 
 func TestGzip(t *testing.T) {
-	var storeMock storage.Storage = make(map[string]string)
 	configMock := config.Config{
-		ServerAddr: "localhost:8080",
-		BaseURL:    "http://localhost:8080",
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
 	}
+	storeMock := storage.NewStorage(configMock.FileStoragePath)
+
 	requestBody := `{ "url": "https://github.com" }`
 	successBody := `{ "result": "http://localhost:8080/3097fca9" }`
 
 	handler := http.HandlerFunc(Gzip(func(w http.ResponseWriter, r *http.Request) {
-		handlers.Shorten(w, r, configMock, &storeMock)
+		handlers.Shorten(w, r, configMock, storeMock)
 	}))
 
 	srv := httptest.NewServer(handler)

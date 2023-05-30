@@ -13,11 +13,12 @@ import (
 
 type payload struct {
 	config  config.Config
-	storage *storage.Storage
+	storage storage.Storage
 }
 
 func StartServer() {
-	p := payload{storage: storage.NewStorage(), config: config.GetConfig()}
+	cfg := config.GetConfig()
+	p := payload{storage: storage.NewStorage(cfg.FileStoragePath), config: cfg}
 	r := chi.NewRouter()
 	logger.Initialize()
 
@@ -25,7 +26,7 @@ func StartServer() {
 	r.Post("/api/shorten", logger.WithLogging(compress.Gzip(p.shortenHandler)))
 	r.Get("/{id}", logger.WithLogging(compress.Gzip(p.getShortURLHandler)))
 
-	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr))
+	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr), zap.String("storage path", cfg.FileStoragePath))
 	err := http.ListenAndServe(p.config.ServerAddr, r)
 	if err != nil {
 		logger.Log.Fatal(err.Error())
