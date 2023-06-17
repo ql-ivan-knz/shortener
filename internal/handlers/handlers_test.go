@@ -1,15 +1,29 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"shortener/config"
+	"shortener/internal/models"
+	"shortener/internal/storage"
 	"strings"
 	"testing"
 )
 
 func TestCreateShortURL(t *testing.T) {
+	cfg := config.Config{
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
+	}
+	var store = storage.NewStorage(cfg.FileStoragePath)
+
+	url := "http://github.com"
+
 	tests := []struct {
 		name                string
 		method              string
@@ -34,7 +48,7 @@ func TestCreateShortURL(t *testing.T) {
 		{
 			name:                "returns 201 status code",
 			method:              http.MethodPost,
-			body:                strings.NewReader("https://github.com"),
+			body:                strings.NewReader(url),
 			expectedCode:        http.StatusCreated,
 			expectedContentType: "text/plain",
 		},
@@ -43,7 +57,7 @@ func TestCreateShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
-			CreateShortURL(w, r)
+			CreateShortURL(w, r, cfg, store)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -57,7 +71,60 @@ func TestCreateShortURL(t *testing.T) {
 	}
 }
 
+func TestCreateShortURLJSON(t *testing.T) {
+	cfg := config.Config{
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
+	}
+	var store = storage.NewStorage(cfg.FileStoragePath)
+
+	tests := []struct {
+		name         string
+		method       string
+		body         models.Request
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "returns error code if method not POST",
+			method:       http.MethodGet,
+			body:         models.Request{URL: "https://github.com"},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "returns error code if provided bad url",
+			method:       http.MethodPost,
+			body:         models.Request{URL: ""},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "returns 200 status code",
+			method:       http.MethodPost,
+			body:         models.Request{URL: "https://github.com"},
+			expectedCode: http.StatusCreated,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body, _ := json.Marshal(test.body)
+			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			Shorten(w, r, cfg, store)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, res.StatusCode, test.expectedCode)
+		})
+	}
+}
+
 func TestGetShortURL(t *testing.T) {
+	var store = storage.NewStorage("")
+	pathID := "3097fca9"
+
 	tests := []struct {
 		name         string
 		method       string
@@ -65,11 +132,6 @@ func TestGetShortURL(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name:         "returns 400 status code when url has additional params",
-			method:       http.MethodGet,
-			path:         "/id/wrong/url",
-			expectedCode: http.StatusBadRequest,
-		}, {
 			name:         "returns 400 status code when method not GET",
 			method:       http.MethodPost,
 			path:         "/id",
@@ -80,7 +142,7 @@ func TestGetShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, test.path, nil)
 			w := httptest.NewRecorder()
-			GetShortURL(w, r)
+			GetShortURL(w, r, pathID, store)
 
 			assert.Equal(t, test.expectedCode, w.Code)
 		})

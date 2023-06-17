@@ -1,26 +1,14 @@
 package storage
 
-import (
-	"errors"
-	"fmt"
-)
+type Storage interface {
+	Get(key string) (string, error)
+	Set(key, value string) error
+}
 
-var errNoExistedURL = errors.New("url_store: no existed url")
-
-var store = make(map[string]string)
-
-func Get(key string) (string, error) {
-	if _, ok := store[key]; ok {
-		return store[key], nil
+func NewStorage(path string) Storage {
+	if path == "" {
+		return NewMapStorage()
 	}
 
-	return "", errNoExistedURL
-}
-
-func Set(key, value string) {
-	store[key] = value
-}
-
-func GetAll() {
-	fmt.Println(store)
+	return NewFileStorage(path)
 }
