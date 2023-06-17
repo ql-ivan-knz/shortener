@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,7 +88,7 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 
 func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storage.Storage) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
+		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
 
@@ -100,4 +101,18 @@ func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storag
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Location", v)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func PingDB(ctx context.Context, w http.ResponseWriter, r *http.Request, store storage.Storage) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
+		return
+	}
+
+	if err := store.Ping(ctx); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

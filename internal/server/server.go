@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"net/http"
@@ -14,20 +15,28 @@ import (
 type payload struct {
 	config  config.Config
 	storage storage.Storage
+	ctx     context.Context
 }
 
 func StartServer() {
 	cfg := config.GetConfig()
-	p := payload{storage: storage.NewStorage(cfg.FileStoragePath), config: cfg}
+	s, err := storage.NewStorage(cfg)
+	if err != nil {
+		logger.Log.Fatal(err.Error())
+		return
+	}
+
+	p := payload{storage: s, config: cfg, ctx: context.Background()}
 	r := chi.NewRouter()
 	logger.Initialize()
 
 	r.Post("/", logger.WithLogging(compress.Gzip(p.createShortURLHandler)))
 	r.Post("/api/shorten", logger.WithLogging(compress.Gzip(p.shortenHandler)))
 	r.Get("/{id}", logger.WithLogging(compress.Gzip(p.getShortURLHandler)))
+	r.Get("/ping", logger.WithLogging(p.pingDB))
 
-	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr), zap.String("storage path", cfg.FileStoragePath))
-	err := http.ListenAndServe(p.config.ServerAddr, r)
+	logger.Log.Info("Server started at", zap.String("address", p.config.ServerAddr))
+	err = http.ListenAndServe(p.config.ServerAddr, r)
 	if err != nil {
 		logger.Log.Fatal(err.Error())
 		return
@@ -45,4 +54,8 @@ func (p *payload) shortenHandler(w http.ResponseWriter, r *http.Request) {
 func (p *payload) getShortURLHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	handlers.GetShortURL(w, r, string(id), p.storage)
+}
+
+func (p *payload) pingDB(w http.ResponseWriter, r *http.Request) {
+	handlers.PingDB(p.ctx, w, r, p.storage)
 }

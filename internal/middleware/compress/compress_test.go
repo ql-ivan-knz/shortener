@@ -19,7 +19,7 @@ func TestGzip(t *testing.T) {
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "",
 	}
-	storeMock := storage.NewStorage(configMock.FileStoragePath)
+	storeMock, _ := storage.NewStorage(configMock)
 
 	requestBody := `{ "url": "https://github.com" }`
 	successBody := `{ "result": "http://localhost:8080/3097fca9" }`

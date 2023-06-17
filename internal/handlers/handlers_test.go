@@ -20,7 +20,7 @@ func TestCreateShortURL(t *testing.T) {
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "",
 	}
-	var store = storage.NewStorage(cfg.FileStoragePath)
+	store, _ := storage.NewStorage(cfg)
 
 	url := "http://github.com"
 
@@ -77,7 +77,7 @@ func TestCreateShortURLJSON(t *testing.T) {
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "",
 	}
-	var store = storage.NewStorage(cfg.FileStoragePath)
+	store, _ := storage.NewStorage(cfg)
 
 	tests := []struct {
 		name         string
@@ -122,7 +122,12 @@ func TestCreateShortURLJSON(t *testing.T) {
 }
 
 func TestGetShortURL(t *testing.T) {
-	var store = storage.NewStorage("")
+	cfg := config.Config{
+		ServerAddr:      "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
+	}
+	store, _ := storage.NewStorage(cfg)
 	pathID := "3097fca9"
 
 	tests := []struct {
