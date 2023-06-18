@@ -37,7 +37,7 @@ func countLines(path string) int {
 	return count
 }
 
-func (s *storage) Set(key, value string) error {
+func (s *storage) Put(ctx context.Context, key, value string) error {
 	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (s *storage) Set(key, value string) error {
 	return nil
 }
 
-func (s *storage) Get(key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (string, error) {
 	file, err := os.OpenFile(s.filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		return "", err

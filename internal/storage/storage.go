@@ -9,8 +9,8 @@ import (
 )
 
 type Storage interface {
-	Get(key string) (string, error)
-	Set(key, value string) error
+	Get(ctx context.Context, key string) (string, error)
+	Put(ctx context.Context, key, value string) error
 	Ping(ctx context.Context) error
 }
 

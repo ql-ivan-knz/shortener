@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,7 +24,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 
 	hash := short.URL(body)
-	err = store.Set(hash, string(body))
+	err = store.Put(r.Context(), hash, string(body))
 	if err != nil {
 		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
 	}
@@ -63,7 +62,7 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 	}
 
 	hash := short.URL([]byte(req.URL))
-	err := store.Set(hash, req.URL)
+	err := store.Put(r.Context(), hash, req.URL)
 	if err != nil {
 		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
 	}
@@ -92,7 +91,7 @@ func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storag
 		return
 	}
 
-	v, err := store.Get(id)
+	v, err := store.Get(r.Context(), id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Couldn't find %s", v), http.StatusBadRequest)
 		return
@@ -103,13 +102,13 @@ func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storag
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func PingDB(ctx context.Context, w http.ResponseWriter, r *http.Request, store storage.Storage) {
+func PingDB(w http.ResponseWriter, r *http.Request, store storage.Storage) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
 
-	if err := store.Ping(ctx); err != nil {
+	if err := store.Ping(r.Context()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

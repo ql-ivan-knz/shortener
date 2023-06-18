@@ -8,7 +8,7 @@ type storage struct {
 	records map[string]string
 }
 
-func (s *storage) Get(key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (string, error) {
 	v, ok := s.records[key]
 	if !ok {
 		return "", nil
@@ -17,7 +17,7 @@ func (s *storage) Get(key string) (string, error) {
 	return v, nil
 }
 
-func (s *storage) Set(key, value string) error {
+func (s *storage) Put(ctx context.Context, key, value string) error {
 	s.records[key] = value
 
 	return nil
