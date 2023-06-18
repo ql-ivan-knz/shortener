@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"shortener/internal/models"
+	"shortener/internal/short"
 	"strconv"
 )
 
@@ -37,7 +39,7 @@ func countLines(path string) int {
 	return count
 }
 
-func (s *storage) Set(key, value string) error {
+func (s *storage) Put(ctx context.Context, key, value string) error {
 	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		return err
@@ -73,7 +75,7 @@ func (s *storage) Set(key, value string) error {
 	return nil
 }
 
-func (s *storage) Get(key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (string, error) {
 	file, err := os.OpenFile(s.filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		return "", err
@@ -98,6 +100,15 @@ func (s *storage) Get(key string) (string, error) {
 }
 
 func (s *storage) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (s *storage) Batch(ctx context.Context, urls models.BatchRequest) error {
+	for _, url := range urls {
+		if err := s.Put(ctx, short.URL([]byte(url.OriginalURL)), url.OriginalURL); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
