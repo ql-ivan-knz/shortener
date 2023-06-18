@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +15,8 @@ import (
 type storage struct {
 	pool *pgxpool.Pool
 }
+
+var ErrorConflict = errors.New("url is already saved")
 
 func NewStorage(dsn string) (*storage, error) {
 	pool, err := initDB(context.Background(), dsn)
@@ -35,6 +38,11 @@ func initDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
+	_, err = pool.Exec(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS id_url ON urls (original)`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set index: %v", err)
+	}
+
 	return pool, nil
 }
 
@@ -49,12 +57,15 @@ func (s *storage) Get(ctx context.Context, key string) (string, error) {
 }
 
 func (s *storage) Put(ctx context.Context, key string, value string) error {
-	_, err := s.pool.Exec(
-		ctx,
-		`INSERT INTO urls (short, original) VALUES ($1, $2)`, key, value,
-	)
+	tag, err := s.pool.Exec(ctx, "INSERT INTO urls (short, original) VALUES ($1, $2) ON CONFLICT (original) DO NOTHING", key, value)
 	if err != nil {
-		return fmt.Errorf("failed insert url: %w", err)
+		return fmt.Errorf("failed to insert row: %v", err)
+	}
+
+	count := tag.RowsAffected()
+
+	if count == 0 {
+		return ErrorConflict
 	}
 
 	return nil

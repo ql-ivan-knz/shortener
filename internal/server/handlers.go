@@ -36,10 +36,10 @@ func (h *Handlers) getShortURLHandler(w http.ResponseWriter, r *http.Request) {
 	handlers.GetShortURL(w, r, string(id), h.storage)
 }
 
-func (h *Handlers) shortenBatch(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) shortenBatchHandler(w http.ResponseWriter, r *http.Request) {
 	handlers.ShortenBatch(w, r, h.config, h.storage)
 }
 
-func (h *Handlers) pingDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) pingDBHandler(w http.ResponseWriter, r *http.Request) {
 	handlers.PingDB(w, r, h.storage)
 }

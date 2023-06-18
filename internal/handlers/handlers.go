@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,9 +11,11 @@ import (
 	"shortener/internal/models"
 	"shortener/internal/short"
 	"shortener/internal/storage"
+	"shortener/internal/storage/db"
 )
 
 func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage) {
+	statusCode := http.StatusCreated
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't parse url", http.StatusBadRequest)
@@ -25,8 +28,13 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 
 	hash := short.URL(body)
 	err = store.Put(r.Context(), hash, string(body))
-	if err != nil {
+	alreadySaved := errors.Is(err, db.ErrorConflict)
+	if err != nil && !alreadySaved {
 		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
+	}
+
+	if alreadySaved {
+		statusCode = http.StatusConflict
 	}
 
 	shortURL, err := url.JoinPath(cfg.BaseURL, hash)
@@ -35,7 +43,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(statusCode)
 	_, err = w.Write([]byte(shortURL))
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -45,6 +53,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 
 func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage) {
 	var req models.Request
+	statusCode := http.StatusCreated
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
@@ -62,11 +71,18 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 	}
 
 	hash := short.URL([]byte(req.URL))
+	fmt.Println(hash)
 	err := store.Put(r.Context(), hash, req.URL)
-	if err != nil {
+	alreadySaved := errors.Is(err, db.ErrorConflict)
+	if err != nil && !alreadySaved {
 		http.Error(w, "Couldn't write url to storage", http.StatusInternalServerError)
 	}
+
+	if alreadySaved {
+		statusCode = http.StatusConflict
+	}
 	shortURL, err := url.JoinPath(cfg.BaseURL, hash)
+	fmt.Println(shortURL)
 	if err != nil {
 		http.Error(w, "Couldn't generate url", http.StatusInternalServerError)
 		return
@@ -77,7 +93,7 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(statusCode)
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "Couldn't send shorten url", http.StatusInternalServerError)

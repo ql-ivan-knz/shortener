@@ -1,21 +1,10 @@
 version: "3.9"
 services:
-  db:
-    image: postgres:15.2
+  postgres:
+    image: postgres:15.3
     environment:
-      POSTGRES_DB: "shorten_links"
-      POSTGRES_USER: "gopher"
-      POSTGRES_PASSWORD: "gopher"
-      PGDATA: "/var/lib/postgresql/data/pgdata"
-    volumes:
-#      - ./internal/storage/db/init:/docker-entrypoint-initdb.d
-      - .:/var/lib/postgresql/data
+      POSTGRES_DB: "shorten"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nameuser -d namedb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped

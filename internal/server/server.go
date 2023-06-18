@@ -15,9 +15,9 @@ func StartServer(h *Handlers) {
 
 	router.Post("/", logger.WithLogging(compress.Gzip(h.createShortURLHandler)))
 	router.Post("/api/shorten", logger.WithLogging(compress.Gzip(h.shortenHandler)))
-	router.Post("/api/shorten/batch", h.shortenBatch)
+	router.Post("/api/shorten/batch", logger.WithLogging(compress.Gzip(h.shortenBatchHandler)))
 	router.Get("/{id}", logger.WithLogging(compress.Gzip(h.getShortURLHandler)))
-	router.Get("/ping", logger.WithLogging(h.pingDB))
+	router.Get("/ping", logger.WithLogging(h.pingDBHandler))
 
 	fmt.Print("started")
 	logger.Log.Info("Server started at", zap.String("address", h.config.ServerAddr))
