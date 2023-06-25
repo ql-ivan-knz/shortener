@@ -12,7 +12,7 @@ import (
 type Storage interface {
 	Get(ctx context.Context, key string) (string, error)
 	Put(ctx context.Context, key, value string) error
-	Batch(ctx context.Context, urls models.BatchRequest) error
+	Batch(ctx context.Context, urls models.BatchDB) error
 	Ping(ctx context.Context) error
 }
 

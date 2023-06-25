@@ -3,7 +3,6 @@ package mapstorage
 import (
 	"context"
 	"shortener/internal/models"
-	"shortener/internal/short"
 )
 
 type storage struct {
@@ -29,9 +28,9 @@ func (s *storage) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (s *storage) Batch(ctx context.Context, urls models.BatchRequest) error {
+func (s *storage) Batch(ctx context.Context, urls models.BatchDB) error {
 	for _, url := range urls {
-		if err := s.Put(ctx, short.URL([]byte(url.OriginalURL)), url.OriginalURL); err != nil {
+		if err := s.Put(ctx, url.ShortURL, url.OriginalURL); err != nil {
 			return err
 		}
 	}

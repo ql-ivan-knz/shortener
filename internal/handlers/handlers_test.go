@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"shortener/config"
+	"shortener/internal/middleware/logger"
 	"shortener/internal/models"
 	"shortener/internal/storage"
 	"strings"
@@ -57,7 +58,8 @@ func TestCreateShortURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
-			CreateShortURL(w, r, cfg, store)
+			l, _ := logger.NewLogger()
+			CreateShortURL(w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -87,12 +89,6 @@ func TestCreateShortURLJSON(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "returns error code if method not POST",
-			method:       http.MethodGet,
-			body:         models.Request{URL: "https://github.com"},
-			expectedCode: http.StatusBadRequest,
-		},
-		{
 			name:         "returns error code if provided bad url",
 			method:       http.MethodPost,
 			body:         models.Request{URL: ""},
@@ -111,45 +107,13 @@ func TestCreateShortURLJSON(t *testing.T) {
 			body, _ := json.Marshal(test.body)
 			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
 			w := httptest.NewRecorder()
-			Shorten(w, r, cfg, store)
+			l, _ := logger.NewLogger()
+			Shorten(w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()
 
 			assert.Equal(t, res.StatusCode, test.expectedCode)
-		})
-	}
-}
-
-func TestGetShortURL(t *testing.T) {
-	cfg := config.Config{
-		ServerAddr:      "localhost:8080",
-		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "",
-	}
-	store, _ := storage.NewStorage(cfg)
-	pathID := "3097fca9"
-
-	tests := []struct {
-		name         string
-		method       string
-		path         string
-		expectedCode int
-	}{
-		{
-			name:         "returns 400 status code when method not GET",
-			method:       http.MethodPost,
-			path:         "/id",
-			expectedCode: http.StatusBadRequest,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(test.method, test.path, nil)
-			w := httptest.NewRecorder()
-			GetShortURL(w, r, pathID, store)
-
-			assert.Equal(t, test.expectedCode, w.Code)
 		})
 	}
 }

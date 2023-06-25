@@ -2,13 +2,16 @@ package db
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"log"
 	"shortener/internal/models"
-	"shortener/internal/short"
-	"strings"
 	"time"
 )
 
@@ -19,35 +22,46 @@ type storage struct {
 var ErrorConflict = errors.New("url is already saved")
 
 func NewStorage(dsn string) (*storage, error) {
-	pool, err := initDB(context.Background(), dsn)
+	if err := runMigrations(dsn); err != nil {
+		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
+	}
+
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create a connection pool: %w", err)
 	}
 	return &storage{
 		pool: pool,
 	}, nil
 }
 
-func initDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+//go:embed migrations/*.sql
+var fs embed.FS
+
+func runMigrations(dsn string) error {
+	d, err := iofs.New(fs, "migrations")
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to return an iosf driver: %v", err)
 	}
-	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS urls (short VARCHAR(8) PRIMARY KEY , original TEXT)`)
+	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create table: %w", err)
+		return fmt.Errorf("failed to get a new migrate instance: %v", err)
+	}
+	if err := m.Up(); err != nil {
+		if !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("failed to apply migrations to the DB: %v", err)
+		}
 	}
 
-	_, err = pool.Exec(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS id_url ON urls (original)`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set index: %v", err)
-	}
-
-	return pool, nil
+	return nil
 }
 
 func (s *storage) Get(ctx context.Context, key string) (string, error) {
-	row := s.pool.QueryRow(ctx, `SELECT original FROM urls WHERE short = $1`, key)
+	row := s.pool.QueryRow(
+		ctx,
+		`SELECT original_url FROM links WHERE hash_url = $1`,
+		key,
+	)
 
 	var url string
 	if err := row.Scan(&url); err != nil {
@@ -57,7 +71,12 @@ func (s *storage) Get(ctx context.Context, key string) (string, error) {
 }
 
 func (s *storage) Put(ctx context.Context, key string, value string) error {
-	tag, err := s.pool.Exec(ctx, "INSERT INTO urls (short, original) VALUES ($1, $2) ON CONFLICT (original) DO NOTHING", key, value)
+	tag, err := s.pool.Exec(
+		ctx,
+		`INSERT INTO links (hash_url, original_url) 
+		 VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING`,
+		key, value,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to insert row: %v", err)
 	}
@@ -71,30 +90,43 @@ func (s *storage) Put(ctx context.Context, key string, value string) error {
 	return nil
 }
 
-func (s *storage) Batch(ctx context.Context, urls models.BatchRequest) error {
+func (s *storage) Batch(ctx context.Context, rows models.BatchDB) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("transaction failed: %v", err)
+		return fmt.Errorf("unable to begin transaction: %v", err)
 	}
 
-	values := make([]string, len(urls))
-
-	for index, url := range urls {
-		values[index] = "('" + short.URL([]byte(url.OriginalURL)) + "', '" + url.OriginalURL + "')"
-	}
-
-	query := "INSERT INTO urls (short, original) VALUES " + strings.Join(values, ", ")
-
-	_, err = tx.Exec(ctx, query)
-	if err != nil {
-		err = tx.Rollback(ctx)
+	defer func() {
 		if err != nil {
-			return fmt.Errorf("failed transacton rollback %v", err)
+			tx.Rollback(ctx)
+			log.Println("transaction rolled back")
 		}
-		return fmt.Errorf("failed to insert line in table with %v", err)
+	}()
+
+	batch := &pgx.Batch{}
+	for _, r := range rows {
+		batch.Queue(
+			`INSERT INTO links (hash_url, original_url) VALUES ($1, $2)`,
+			r.ShortURL, r.OriginalURL,
+		)
 	}
 
-	return tx.Commit(ctx)
+	results := s.pool.SendBatch(ctx, batch)
+	defer results.Close()
+
+	for i := 0; i < batch.Len(); i++ {
+		_, err := results.Exec()
+		if err != nil {
+			return fmt.Errorf("error executing statement %v", err)
+		}
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return fmt.Errorf("error committing transaction: %v", err)
+	}
+
+	return nil
 }
 
 func (s *storage) Ping(ctx context.Context) error {

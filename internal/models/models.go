@@ -8,6 +8,14 @@ type Response struct {
 	Result string `json:"result"`
 }
 
+type BatchDBItem struct {
+	CorrelationID string
+	OriginalURL   string
+	ShortURL      string
+}
+
+type BatchDB []BatchDBItem
+
 type BatchRequest []struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
