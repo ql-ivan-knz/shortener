@@ -1,15 +1,20 @@
-package storage
+package file
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"shortener/internal/models"
 	"strconv"
 )
 
-type FileStorage string
+type storage struct {
+	filePath string
+	numLines int
+}
 
 type ShortenURL struct {
 	UUID        string `json:"uuid"`
@@ -19,7 +24,7 @@ type ShortenURL struct {
 
 var increment = 0
 
-func initIncrement(path string) {
+func countLines(path string) int {
 	fmt.Println("init increment")
 	count := 0
 
@@ -30,11 +35,11 @@ func initIncrement(path string) {
 		count++
 	}
 
-	increment = count
+	return count
 }
 
-func (f FileStorage) Set(key, value string) error {
-	file, err := os.OpenFile(string(f), os.O_RDWR|os.O_APPEND, 0666)
+func (s *storage) Put(ctx context.Context, key, value string) error {
+	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}
@@ -69,8 +74,8 @@ func (f FileStorage) Set(key, value string) error {
 	return nil
 }
 
-func (f FileStorage) Get(key string) (string, error) {
-	file, err := os.OpenFile(string(f), os.O_RDONLY, 0666)
+func (s *storage) Get(ctx context.Context, key string) (string, error) {
+	file, err := os.OpenFile(s.filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		return "", err
 	}
@@ -93,17 +98,25 @@ func (f FileStorage) Get(key string) (string, error) {
 	return "", nil
 }
 
-func NewFileStorage(path string) Storage {
-	var p = FileStorage(path)
+func (s *storage) Ping(ctx context.Context) error {
+	return nil
+}
 
+func (s *storage) Batch(ctx context.Context, urls models.BatchDB) error {
+	for _, url := range urls {
+		if err := s.Put(ctx, url.ShortURL, url.OriginalURL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewStorage(path string) (*storage, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Create file if no exists
 		os.MkdirAll(filepath.Dir(path), 0666)
 		os.Create(path)
-	} else {
-		// If file exist check how many it has lines for setting up autoincrement for `uuid`
-		initIncrement(path)
 	}
 
-	return p
+	return &storage{filePath: path, numLines: countLines(path)}, nil
 }

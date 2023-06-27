@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"shortener/config"
 	"shortener/internal/handlers"
+	"shortener/internal/middleware/logger"
 	"shortener/internal/storage"
 	"testing"
 )
@@ -19,14 +20,16 @@ func TestGzip(t *testing.T) {
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "",
 	}
-	storeMock := storage.NewStorage(configMock.FileStoragePath)
+	storeMock, _ := storage.NewStorage(configMock)
+	l, _ := logger.NewLogger()
 
 	requestBody := `{ "url": "https://github.com" }`
 	successBody := `{ "result": "http://localhost:8080/3097fca9" }`
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.Shorten(w, r, configMock, storeMock, l)
+	})
 
-	handler := http.HandlerFunc(Gzip(func(w http.ResponseWriter, r *http.Request) {
-		handlers.Shorten(w, r, configMock, storeMock)
-	}))
+	handler := Gzip(h, l)
 
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
