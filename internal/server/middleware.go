@@ -3,6 +3,7 @@ package server
 import (
 	"go.uber.org/zap"
 	"net/http"
+	"shortener/internal/auth"
 	"shortener/internal/middleware/compress"
 	"shortener/internal/middleware/logger"
 )
@@ -23,4 +24,8 @@ func (m *Middleware) withLogging(h http.Handler) http.Handler {
 
 func (m *Middleware) withCompressing(h http.Handler) http.Handler {
 	return compress.Gzip(h, m.logger)
+}
+
+func (m *Middleware) withAuth(h http.Handler) http.Handler {
+	return auth.WithAuth(h, m.logger)
 }

@@ -11,8 +11,9 @@ import (
 
 type Storage interface {
 	Get(ctx context.Context, key string) (string, error)
-	Put(ctx context.Context, key, value string) error
-	Batch(ctx context.Context, urls models.BatchDB) error
+	Put(ctx context.Context, key, value string, userID string) error
+	Batch(ctx context.Context, urls []models.URLItem, userID string) error
+	GetAllURLs(ctx context.Context, userID string) ([]models.URLItem, error)
 	Ping(ctx context.Context) error
 }
 

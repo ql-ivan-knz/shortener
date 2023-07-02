@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"shortener/config"
 	"shortener/internal/middleware/logger"
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	m := server.NewMiddleware(lg)
-	h := server.NewHandlers(cfg, s, lg)
+	h := server.NewHandlers(context.Background(), cfg, s, lg)
 
 	err = server.Run(h, m)
 	if err != nil {

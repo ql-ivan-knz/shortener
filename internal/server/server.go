@@ -9,11 +9,13 @@ func Run(h *Handlers, m *Middleware) error {
 	router := chi.NewRouter()
 
 	router.Use(m.withLogging)
+	router.Use(m.withAuth)
 	router.Use(m.withCompressing)
 
 	router.Post("/", h.createShortURLHandler)
 	router.Post("/api/shorten", h.shortenHandler)
 	router.Post("/api/shorten/batch", h.shortenBatchHandler)
+	router.Get("/api/user/urls", h.getAllURLs)
 	router.Get("/{id}", h.getShortURLHandler)
 	router.Get("/ping", h.pingDBHandler)
 

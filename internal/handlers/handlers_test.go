@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -59,7 +60,7 @@ func TestCreateShortURL(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
 			l, _ := logger.NewLogger()
-			CreateShortURL(w, r, cfg, store, l)
+			CreateShortURL(context.Background(), w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -108,7 +109,7 @@ func TestCreateShortURLJSON(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			l, _ := logger.NewLogger()
-			Shorten(w, r, cfg, store, l)
+			Shorten(context.Background(), w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()

@@ -3,6 +3,7 @@ package compress
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
@@ -26,7 +27,7 @@ func TestGzip(t *testing.T) {
 	requestBody := `{ "url": "https://github.com" }`
 	successBody := `{ "result": "http://localhost:8080/3097fca9" }`
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlers.Shorten(w, r, configMock, storeMock, l)
+		handlers.Shorten(context.Background(), w, r, configMock, storeMock, l)
 	})
 
 	handler := Gzip(h, l)
