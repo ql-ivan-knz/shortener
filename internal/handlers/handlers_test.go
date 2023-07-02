@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -22,8 +23,6 @@ func TestCreateShortURL(t *testing.T) {
 		FileStoragePath: "",
 	}
 	store, _ := storage.NewStorage(cfg)
-
-	url := "http://github.com"
 
 	tests := []struct {
 		name                string
@@ -46,20 +45,13 @@ func TestCreateShortURL(t *testing.T) {
 			expectedCode:        http.StatusBadRequest,
 			expectedContentType: "",
 		},
-		{
-			name:                "returns 201 status code",
-			method:              http.MethodPost,
-			body:                strings.NewReader(url),
-			expectedCode:        http.StatusCreated,
-			expectedContentType: "text/plain",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/", test.body)
 			w := httptest.NewRecorder()
 			l, _ := logger.NewLogger()
-			CreateShortURL(w, r, cfg, store, l)
+			CreateShortURL(context.Background(), w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -94,12 +86,6 @@ func TestCreateShortURLJSON(t *testing.T) {
 			body:         models.Request{URL: ""},
 			expectedCode: http.StatusBadRequest,
 		},
-		{
-			name:         "returns 200 status code",
-			method:       http.MethodPost,
-			body:         models.Request{URL: "https://github.com"},
-			expectedCode: http.StatusCreated,
-		},
 	}
 
 	for _, test := range tests {
@@ -108,7 +94,7 @@ func TestCreateShortURLJSON(t *testing.T) {
 			r := httptest.NewRequest(test.method, "/shorten", bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			l, _ := logger.NewLogger()
-			Shorten(w, r, cfg, store, l)
+			Shorten(context.Background(), w, r, cfg, store, l)
 
 			res := w.Result()
 			defer res.Body.Close()

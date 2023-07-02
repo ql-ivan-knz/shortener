@@ -3,4 +3,4 @@ CREATE TABLE IF NOT EXISTS links (
     hash_url varchar(8) NOT NULL
 );
 
-CREATE INDEX hash_idx ON links USING HASH(hash_url);
+CREATE INDEX hash_idx ON links (hash_url);

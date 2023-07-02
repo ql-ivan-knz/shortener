@@ -18,7 +18,7 @@ func (s *storage) Get(ctx context.Context, key string) (string, error) {
 	return v, nil
 }
 
-func (s *storage) Put(ctx context.Context, key, value string) error {
+func (s *storage) Put(ctx context.Context, key, value, userID string) error {
 	s.records[key] = value
 
 	return nil
@@ -28,13 +28,17 @@ func (s *storage) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (s *storage) Batch(ctx context.Context, urls models.BatchDB) error {
+func (s *storage) Batch(ctx context.Context, urls []models.URLItem, userID string) error {
 	for _, url := range urls {
-		if err := s.Put(ctx, url.ShortURL, url.OriginalURL); err != nil {
+		if err := s.Put(ctx, url.ShortURL, url.OriginalURL, userID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (s *storage) GetAllURLs(ctx context.Context, userID string) ([]models.URLItem, error) {
+	return nil, nil
 }
 
 func NewStorage() (*storage, error) {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,13 +10,16 @@ import (
 	"net/http"
 	"net/url"
 	"shortener/config"
+	"shortener/internal/auth"
 	"shortener/internal/models"
 	"shortener/internal/short"
 	"shortener/internal/storage"
 	"shortener/internal/storage/db"
 )
 
-func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+func CreateShortURL(ctx context.Context, w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+	rCtx := r.Context()
+	userID := rCtx.Value(auth.ContextKey("userID"))
 	statusCode := http.StatusCreated
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -30,7 +34,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 
 	hash := short.URL(body)
-	err = store.Put(r.Context(), hash, string(body))
+	err = store.Put(ctx, hash, string(body), userID.(string))
 	alreadySaved := errors.Is(err, db.ErrorConflict)
 	if err != nil && !alreadySaved {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -49,6 +53,8 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 		return
 	}
 
+	logger.Info(userID, shortURL, r.URL.Path, "create url")
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(statusCode)
 	_, err = w.Write([]byte(shortURL))
@@ -59,9 +65,11 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request, cfg config.Config, s
 	}
 }
 
-func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+func Shorten(ctx context.Context, w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
 	var req models.Request
 	statusCode := http.StatusCreated
+	rCtx := r.Context()
+	userID := rCtx.Value(auth.ContextKey("userID"))
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -77,7 +85,7 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 
 	hash := short.URL([]byte(req.URL))
 	fmt.Println(hash)
-	err := store.Put(r.Context(), hash, req.URL)
+	err := store.Put(ctx, hash, req.URL, userID.(string))
 	alreadySaved := errors.Is(err, db.ErrorConflict)
 	if err != nil && !alreadySaved {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -110,20 +118,30 @@ func Shorten(w http.ResponseWriter, r *http.Request, cfg config.Config, store st
 	}
 }
 
-func GetShortURL(w http.ResponseWriter, r *http.Request, id string, store storage.Storage, logger *zap.SugaredLogger) {
-	v, err := store.Get(r.Context(), id)
+func GetShortURL(ctx context.Context, w http.ResponseWriter, r *http.Request, id string, store storage.Storage, logger *zap.SugaredLogger) {
+	v, err := store.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		logger.Errorw("Can't find shorten url", "error", err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	if v == "" {
+		http.Error(w, "Link not found", http.StatusBadRequest)
+		return
+	}
+
+	logger.Info(r.URL.Path, "requested link")
+	logger.Info(v, "hashed link")
+
 	w.Header().Set("Location", v)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func ShortenBatch(w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+func ShortenBatch(ctx context.Context, w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+	rCtx := r.Context()
+	userID := rCtx.Value(auth.ContextKey("userID"))
+
 	var urls models.BatchRequest
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&urls); err != nil {
@@ -138,9 +156,9 @@ func ShortenBatch(w http.ResponseWriter, r *http.Request, cfg config.Config, sto
 		return
 	}
 
-	var dbBatch models.BatchDB
+	var dbBatch []models.URLItem
 	for _, u := range urls {
-		item := models.BatchDBItem{
+		item := models.URLItem{
 			CorrelationID: u.CorrelationID,
 			OriginalURL:   u.OriginalURL,
 			ShortURL:      short.URL([]byte(u.OriginalURL)),
@@ -148,7 +166,7 @@ func ShortenBatch(w http.ResponseWriter, r *http.Request, cfg config.Config, sto
 		dbBatch = append(dbBatch, item)
 	}
 
-	err := store.Batch(r.Context(), dbBatch)
+	err := store.Batch(ctx, dbBatch, userID.(string))
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		logger.Errorw("Can't save urls in storage", "error", err)
@@ -191,4 +209,51 @@ func PingDB(w http.ResponseWriter, r *http.Request, store storage.Storage, logge
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func GetAllURLs(ctx context.Context, w http.ResponseWriter, r *http.Request, cfg config.Config, store storage.Storage, logger *zap.SugaredLogger) {
+	rCtx := r.Context()
+	userID := rCtx.Value(auth.ContextKey("userID"))
+
+	urls, err := store.GetAllURLs(ctx, userID.(string))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		logger.Errorw("failed to get user urls", "err", err)
+		return
+	}
+
+	logger.Infow("get all urls", "userid", userID)
+	logger.Infow("urls before", "urls", urls)
+
+	w.Header().Set("content-type", "application/json")
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		var response []models.URLItem
+		for _, u := range urls {
+			shortURL, err := url.JoinPath(cfg.BaseURL, u.ShortURL)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				logger.Errorw("Can't create url", "error", err)
+				return
+			}
+
+			item := models.URLItem{
+				ShortURL:    shortURL,
+				OriginalURL: u.OriginalURL,
+			}
+
+			response = append(response, item)
+		}
+		logger.Infow("user id", "userId", userID)
+		logger.Infow("urls in", "urls", urls)
+		logger.Infow("response", "res", response)
+		w.WriteHeader(http.StatusOK)
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(response); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			logger.Errorw("error encoding response", "err", err)
+			return
+		}
+	}
 }
