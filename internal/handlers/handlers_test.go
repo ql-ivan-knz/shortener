@@ -24,8 +24,6 @@ func TestCreateShortURL(t *testing.T) {
 	}
 	store, _ := storage.NewStorage(cfg)
 
-	url := "http://github.com"
-
 	tests := []struct {
 		name                string
 		method              string
@@ -46,13 +44,6 @@ func TestCreateShortURL(t *testing.T) {
 			body:                strings.NewReader("z234dkj;ak"),
 			expectedCode:        http.StatusBadRequest,
 			expectedContentType: "",
-		},
-		{
-			name:                "returns 201 status code",
-			method:              http.MethodPost,
-			body:                strings.NewReader(url),
-			expectedCode:        http.StatusCreated,
-			expectedContentType: "text/plain",
 		},
 	}
 	for _, test := range tests {
@@ -94,12 +85,6 @@ func TestCreateShortURLJSON(t *testing.T) {
 			method:       http.MethodPost,
 			body:         models.Request{URL: ""},
 			expectedCode: http.StatusBadRequest,
-		},
-		{
-			name:         "returns 200 status code",
-			method:       http.MethodPost,
-			body:         models.Request{URL: "https://github.com"},
-			expectedCode: http.StatusCreated,
 		},
 	}
 

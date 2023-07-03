@@ -3,6 +3,7 @@ package server
 import (
 	"go.uber.org/zap"
 	"net/http"
+	"shortener/config"
 	"shortener/internal/auth"
 	"shortener/internal/middleware/compress"
 	"shortener/internal/middleware/logger"
@@ -10,11 +11,13 @@ import (
 
 type Middleware struct {
 	logger *zap.SugaredLogger
+	cfg    config.Config
 }
 
-func NewMiddleware(lg *zap.SugaredLogger) *Middleware {
+func NewMiddleware(lg *zap.SugaredLogger, config config.Config) *Middleware {
 	return &Middleware{
 		logger: lg,
+		cfg:    config,
 	}
 }
 
@@ -27,5 +30,5 @@ func (m *Middleware) withCompressing(h http.Handler) http.Handler {
 }
 
 func (m *Middleware) withAuth(h http.Handler) http.Handler {
-	return auth.WithAuth(h, m.logger)
+	return auth.WithAuth(h, m.cfg, m.logger)
 }

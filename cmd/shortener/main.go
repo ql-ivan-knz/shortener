@@ -24,7 +24,7 @@ func main() {
 		return
 	}
 
-	m := server.NewMiddleware(lg)
+	m := server.NewMiddleware(lg, cfg)
 	h := server.NewHandlers(context.Background(), cfg, s, lg)
 
 	err = server.Run(h, m)

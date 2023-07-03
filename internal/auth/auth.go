@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
+	"shortener/config"
 )
 
 type Claims struct {
@@ -15,41 +16,41 @@ type Claims struct {
 	UserID string
 }
 
-type ContextKey string
+type contextKey int
 
-const secret = "shouldBeSavedInEnvFile"
+const UserIDContextKey contextKey = iota
 
-func WithAuth(h http.Handler, logger *zap.SugaredLogger) http.Handler {
+func WithAuth(h http.Handler, cfg config.Config, logger *zap.SugaredLogger) http.Handler {
 	authMiddleware := func(w http.ResponseWriter, r *http.Request) {
 		authToken, err := r.Cookie("AuthToken")
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
 				id := uuid.NewString()
-				token, err := generateJWTToken(id)
+				token, err := generateJWTToken(id, cfg)
 				if err != nil {
-					logger.Errorw("failed to get token", "err", err)
+					logger.Errorf("Failed to get token string: %v", err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				ctx := context.WithValue(r.Context(), ContextKey("userID"), id)
+				ctx := context.WithValue(r.Context(), UserIDContextKey, id)
 				setAuthCookie(w, token)
 				h.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
-			logger.Errorw("failed to get AuthToken", "err", err)
+			logger.Errorf("Failed to get AuthToken: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		userID := GetUserID(authToken.Value)
+		userID := GetUserIDFromJWTToken(authToken.Value, cfg)
 		if userID == "" {
-			logger.Errorw("failed to parse userID")
+			logger.Errorw("Failed to parse userID from jwt token")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), ContextKey("userID"), userID)
+		ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
 		setAuthCookie(w, authToken.Value)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -57,28 +58,27 @@ func WithAuth(h http.Handler, logger *zap.SugaredLogger) http.Handler {
 	return http.HandlerFunc(authMiddleware)
 }
 
-func generateJWTToken(id string) (string, error) {
+func generateJWTToken(id string, cfg config.Config) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		UserID: id,
 	})
 
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, err := token.SignedString([]byte(cfg.JWTSecret))
 	if err != nil {
-		return "", fmt.Errorf("failed to generate token string: %v", err)
+		return "", fmt.Errorf("failed to generate token string: %w", err)
 	}
 
 	return tokenString, nil
-
 }
 
-func GetUserID(tokenString string) string {
+func GetUserIDFromJWTToken(tokenString string, cfg config.Config) string {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
-			return []byte(secret), nil
+			return []byte(cfg.JWTSecret), nil
 		})
 
 	if err != nil {

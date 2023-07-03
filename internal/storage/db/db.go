@@ -19,6 +19,11 @@ type storage struct {
 	pool *pgxpool.Pool
 }
 
+type GetURL struct {
+	originalURL string
+	isDeleted   bool
+}
+
 var ErrorConflict = errors.New("url is already saved")
 
 func NewStorage(dsn string) (*storage, error) {
@@ -56,26 +61,26 @@ func runMigrations(dsn string) error {
 	return nil
 }
 
-func (s *storage) Get(ctx context.Context, key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (models.URLItem, error) {
+	var urls models.URLItem
 	row := s.pool.QueryRow(
 		ctx,
-		`SELECT original_url FROM links WHERE hash_url = $1`,
+		`SELECT hash_url, original_url, is_deleted FROM links WHERE hash_url = $1`,
 		key,
 	)
 
-	var url string
-	if err := row.Scan(&url); err != nil {
-		return "", fmt.Errorf("failed to read row: %v", err)
+	if err := row.Scan(&urls.ShortURL, &urls.OriginalURL, &urls.IsDeleted); err != nil {
+		return urls, fmt.Errorf("failed to read row: %v", err)
 	}
-	return url, nil
+	return urls, nil
 }
 
-func (s *storage) Put(ctx context.Context, key string, value string, userID string) error {
+func (s *storage) Put(ctx context.Context, hash string, original string, userID string) error {
 	tag, err := s.pool.Exec(
 		ctx,
 		`INSERT INTO links (hash_url, original_url, user_id) 
 		 VALUES ($1, $2, $3) ON CONFLICT (original_url) DO NOTHING`,
-		key, value, userID,
+		hash, original, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert row: %v", err)
@@ -154,6 +159,15 @@ func (s *storage) GetAllURLs(ctx context.Context, userID string) ([]models.URLIt
 	}
 
 	return urls, nil
+}
+
+func (s *storage) DeleteURLs(ctx context.Context, urls []string, userID string) error {
+	_, err := s.pool.Exec(ctx, "UPDATE links SET is_deleted = true WHERE user_id = $1 AND hash_url = any($2)", userID, urls)
+	if err != nil {
+		return fmt.Errorf("failed to update is_deleted column: %w", err)
+	}
+
+	return nil
 }
 
 func (s *storage) Ping(ctx context.Context) error {

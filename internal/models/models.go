@@ -9,9 +9,10 @@ type Response struct {
 }
 
 type URLItem struct {
-	CorrelationID string
-	OriginalURL   string
-	ShortURL      string
+	CorrelationID string `json:"_,omitempty"`
+	ShortURL      string `json:"short_url"`
+	OriginalURL   string `json:"original_url"`
+	IsDeleted     bool   `json:"is_deleted"`
 }
 
 type BatchRequest []struct {
@@ -25,3 +26,5 @@ type BatchResponseItem struct {
 }
 
 type BatchResponse []BatchResponseItem
+
+type DeleteURLsRequest []string

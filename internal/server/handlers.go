@@ -36,7 +36,7 @@ func (h *Handlers) shortenHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) getShortURLHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	handlers.GetShortURL(w, r, string(id), h.storage, h.logger)
+	handlers.GetShortURL(h.ctx, w, r, string(id), h.storage, h.logger)
 }
 
 func (h *Handlers) shortenBatchHandler(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,11 @@ func (h *Handlers) shortenBatchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) getAllURLs(w http.ResponseWriter, r *http.Request) {
-	handlers.GetAllURLs(h.ctx, w, r, h.storage, h.logger)
+	handlers.GetAllURLs(h.ctx, w, r, h.config, h.storage, h.logger)
+}
+
+func (h *Handlers) deleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	handlers.DeleteURLs(h.ctx, w, r, h.config, h.storage, h.logger)
 }
 
 func (h *Handlers) pingDBHandler(w http.ResponseWriter, r *http.Request) {

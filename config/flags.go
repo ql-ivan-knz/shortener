@@ -10,6 +10,7 @@ type Config struct {
 	BaseURL         string
 	FileStoragePath string
 	DatabaseDSN     string
+	JWTSecret       string
 }
 
 func GetConfig() Config {
@@ -19,6 +20,7 @@ func GetConfig() Config {
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "")
 	flag.StringVar(&cfg.FileStoragePath, "f", "short-url-db.json", "file storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "connect to database")
+	flag.StringVar(&cfg.JWTSecret, "s", "jwt_secret", "JWT secret")
 
 	flag.Parse()
 
@@ -36,6 +38,10 @@ func GetConfig() Config {
 
 	if envDatabase := os.Getenv("DATABASE_DSN"); envDatabase != "" {
 		cfg.DatabaseDSN = envDatabase
+	}
+
+	if envJWTSecret := os.Getenv("JWT_SECRET"); envJWTSecret != "" {
+		cfg.JWTSecret = envJWTSecret
 	}
 
 	return cfg

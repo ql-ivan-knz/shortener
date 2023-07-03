@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"shortener/internal/models"
-	"strconv"
 )
 
 type storage struct {
@@ -16,11 +15,11 @@ type storage struct {
 	numLines int
 }
 
-type ShortenURL struct {
-	UUID        string `json:"uuid"`
+type fileLine struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 	UserID      string `json:"user_id"`
+	IsDeleted   bool   `json:"is_deleted"`
 }
 
 var increment = 0
@@ -48,7 +47,7 @@ func (s *storage) Put(ctx context.Context, key, value, userID string) error {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		su := ShortenURL{}
+		su := fileLine{}
 
 		if err := json.Unmarshal(scanner.Bytes(), &su); err != nil {
 			return err
@@ -60,7 +59,7 @@ func (s *storage) Put(ctx context.Context, key, value, userID string) error {
 	}
 
 	increment++
-	su := ShortenURL{UUID: strconv.Itoa(increment), ShortURL: key, OriginalURL: value, UserID: userID}
+	su := fileLine{ShortURL: key, OriginalURL: value, UserID: userID}
 	data, err := json.Marshal(&su)
 	if err != nil {
 		return err
@@ -75,28 +74,32 @@ func (s *storage) Put(ctx context.Context, key, value, userID string) error {
 	return nil
 }
 
-func (s *storage) Get(ctx context.Context, key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (models.URLItem, error) {
 	file, err := os.OpenFile(s.filePath, os.O_RDONLY, 0666)
 	if err != nil {
-		return "", err
+		return models.URLItem{}, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		fmt.Println("in get")
-		su := ShortenURL{}
+		su := fileLine{}
 
 		if err := json.Unmarshal(scanner.Bytes(), &su); err != nil {
-			return "", err
+			return models.URLItem{}, err
 		}
 
 		if su.ShortURL == key {
-			return su.OriginalURL, nil
+			return models.URLItem{
+				OriginalURL: su.OriginalURL,
+				ShortURL:    su.ShortURL,
+				IsDeleted:   su.IsDeleted,
+			}, nil
 		}
 	}
 
-	return "", nil
+	return models.URLItem{}, nil
 }
 
 func (s *storage) Ping(ctx context.Context) error {
@@ -114,6 +117,10 @@ func (s *storage) Batch(ctx context.Context, urls []models.URLItem, userID strin
 
 func (s *storage) GetAllURLs(ctx context.Context, userID string) ([]models.URLItem, error) {
 	return nil, nil
+}
+
+func (s *storage) DeleteURLs(ctx context.Context, shortURLs []string, userID string) error {
+	return nil
 }
 
 func NewStorage(path string) (*storage, error) {
