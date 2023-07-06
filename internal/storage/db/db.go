@@ -19,6 +19,11 @@ type storage struct {
 	pool *pgxpool.Pool
 }
 
+type GetURL struct {
+	originalURL string
+	isDeleted   bool
+}
+
 var ErrorConflict = errors.New("url is already saved")
 
 func NewStorage(dsn string) (*storage, error) {
@@ -56,26 +61,26 @@ func runMigrations(dsn string) error {
 	return nil
 }
 
-func (s *storage) Get(ctx context.Context, key string) (string, error) {
+func (s *storage) Get(ctx context.Context, key string) (models.URLItem, error) {
+	var urls models.URLItem
 	row := s.pool.QueryRow(
 		ctx,
-		`SELECT original_url FROM links WHERE hash_url = $1`,
+		`SELECT hash_url, original_url, is_deleted FROM links WHERE hash_url = $1`,
 		key,
 	)
 
-	var url string
-	if err := row.Scan(&url); err != nil {
-		return "", fmt.Errorf("failed to read row: %v", err)
+	if err := row.Scan(&urls.ShortURL, &urls.OriginalURL, &urls.IsDeleted); err != nil {
+		return urls, fmt.Errorf("failed to read row: %v", err)
 	}
-	return url, nil
+	return urls, nil
 }
 
-func (s *storage) Put(ctx context.Context, key string, value string) error {
+func (s *storage) Put(ctx context.Context, hash string, original string, userID string) error {
 	tag, err := s.pool.Exec(
 		ctx,
-		`INSERT INTO links (hash_url, original_url) 
-		 VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING`,
-		key, value,
+		`INSERT INTO links (hash_url, original_url, user_id) 
+		 VALUES ($1, $2, $3) ON CONFLICT (original_url) DO NOTHING`,
+		hash, original, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert row: %v", err)
@@ -90,7 +95,7 @@ func (s *storage) Put(ctx context.Context, key string, value string) error {
 	return nil
 }
 
-func (s *storage) Batch(ctx context.Context, rows models.BatchDB) error {
+func (s *storage) Batch(ctx context.Context, rows []models.URLItem, userID string) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to begin transaction: %v", err)
@@ -106,8 +111,8 @@ func (s *storage) Batch(ctx context.Context, rows models.BatchDB) error {
 	batch := &pgx.Batch{}
 	for _, r := range rows {
 		batch.Queue(
-			`INSERT INTO links (hash_url, original_url) VALUES ($1, $2)`,
-			r.ShortURL, r.OriginalURL,
+			`INSERT INTO links (hash_url, original_url, user_id) VALUES ($1, $2, $3)`,
+			r.ShortURL, r.OriginalURL, userID,
 		)
 	}
 
@@ -124,6 +129,42 @@ func (s *storage) Batch(ctx context.Context, rows models.BatchDB) error {
 	err = tx.Commit(context.Background())
 	if err != nil {
 		return fmt.Errorf("error committing transaction: %v", err)
+	}
+
+	return nil
+}
+
+func (s *storage) GetAllURLs(ctx context.Context, userID string) ([]models.URLItem, error) {
+	rows, err := s.pool.Query(ctx, "SELECT hash_url, original_url FROM links WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed urls belong to userID=%s: %v", userID, err)
+	}
+	defer rows.Close()
+
+	var urls []models.URLItem
+	for rows.Next() {
+		var row models.URLItem
+
+		err = rows.Scan(&row.ShortURL, &row.OriginalURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan urls %v", err)
+		}
+
+		urls = append(urls, row)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting urls %v", err)
+	}
+
+	return urls, nil
+}
+
+func (s *storage) DeleteURLs(ctx context.Context, urls []string, userID string) error {
+	_, err := s.pool.Exec(ctx, "UPDATE links SET is_deleted = true WHERE user_id = $1 AND hash_url = any($2)", userID, urls)
+	if err != nil {
+		return fmt.Errorf("failed to update is_deleted column: %w", err)
 	}
 
 	return nil
